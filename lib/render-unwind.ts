@@ -6,13 +6,15 @@ export interface RenderUnwindOptions {
 
 /**
  * Emits a JS payload that, when pasted into Vivaldi's internal DevTools console,
- * removes any Vivaldi Workspace whose `name` matches one of the Arc Space titles
- * in `payload`, and closes all tabs whose `vivExtData.workspaceId` references
- * a removed workspace.
+ * closes all tabs whose `vivExtData.workspaceId` references a Vivaldi Workspace
+ * whose `name` matches one of the Arc Space titles in `payload`.
  *
- * The match is by NAME, not by id — because the inject-time ids are runtime-
- * picked (`Date.now()`) and we cannot embed them at generation time. Name match
- * means re-running unwind cleanly handles multiple imports.
+ * It does NOT remove the workspace entries themselves — those are created by
+ * the user via Vivaldi's UI as a prerequisite of the import flow, so removing
+ * them on unwind would destroy user-managed state.
+ *
+ * Match is by NAME because the workspace ids are owned by Vivaldi and we can't
+ * embed them at generation time.
  */
 export function renderUnwindScript(
   payload: InjectablePayload,
@@ -29,8 +31,10 @@ export function renderUnwindScript(
 // Paste into Vivaldi's internal DevTools console
 // (chrome://inspect/#apps -> click 'inspect' next to window.html).
 //
-// Removes any workspace whose name matches one of ARC_SPACE_NAMES below,
-// and closes all tabs that reference a removed workspaceId.
+// Closes any tab whose vivExtData.workspaceId points at a workspace whose
+// name matches one of ARC_SPACE_NAMES below. Leaves the workspace entries
+// themselves intact — you created them in Vivaldi's UI, so they're yours
+// to manage.
 //
 // Generated: ${payload.generatedAt}
 // Source:    ${payload.sourcePath}
@@ -51,7 +55,6 @@ const DRY_RUN = ${dryRunLiteral};
   }
 
   const getPref = (path) => new Promise((res) => vivaldi.prefs.get(path, res));
-  const setPref = (path, value) => vivaldi.prefs.set({ path, value });
   const queryTabs = () => new Promise((res) => chrome.tabs.query({}, res));
   const removeTabs = (ids) => new Promise((res, rej) =>
     chrome.tabs.remove(ids, () =>
@@ -85,12 +88,11 @@ const DRY_RUN = ${dryRunLiteral};
   });
   const tabIds = tabsToClose.map((t) => t.id).filter((id) => typeof id === "number" && id >= 0);
 
-  log("tabs to close:", tabIds.length);
-  log("workspaces to remove:", targetIds.size);
+  log("tabs to close:", tabIds.length, "(across", targets.length, "workspace(s))");
 
   if (DRY_RUN) {
     log("DRY: would close tab ids", tabIds);
-    log("DRY: would set workspaces.list to remaining", list.length - targets.length, "entries");
+    log("DRY: workspaces.list would be left untouched.");
     log("DRY: nothing was actually removed.");
     return;
   }
@@ -104,9 +106,7 @@ const DRY_RUN = ${dryRunLiteral};
     }
   }
 
-  const remaining = list.filter((w) => !targetIds.has(w.id));
-  setPref("vivaldi.workspaces.list", remaining);
-  log("workspaces.list updated;", targets.length, "entries removed; remaining count:", remaining.length);
+  log("workspaces.list left intact — manage the workspace entries via Vivaldi's UI.");
   log("DONE");
 })();
 `;

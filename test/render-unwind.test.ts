@@ -40,7 +40,6 @@ test("renderUnwindScript: references the expected API surface", () => {
   const src = renderUnwindScript(sample, { dryRun: false });
   for (const name of [
     "vivaldi.prefs.get",
-    "vivaldi.prefs.set",
     "vivaldi.workspaces.list",
     "chrome.tabs.query",
     "chrome.tabs.remove",
@@ -49,6 +48,11 @@ test("renderUnwindScript: references the expected API surface", () => {
   ]) {
     ok(src.includes(name), "expected output to mention " + name);
   }
+});
+
+test("renderUnwindScript: does NOT mutate the workspaces.list pref", () => {
+  const src = renderUnwindScript(sample, { dryRun: false });
+  ok(!src.includes("vivaldi.prefs.set"), "unwind must not write the workspaces pref — user owns it now");
 });
 
 test("renderUnwindScript: is a self-invoking async IIFE", () => {
