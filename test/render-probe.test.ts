@@ -12,11 +12,12 @@ test("renderProbeScript: includes the key probe targets", () => {
   const src = renderProbeScript();
   for (const target of [
     "vivaldi",
-    "workspaces",
-    "workspacesPrivate",
+    "prefs",
     "tabsPrivate",
     "bookmarksPrivate",
     "sessionsPrivate",
+    "windowPrivate",
+    "vivaldi.workspaces.list",
     "JSON.stringify",
   ]) {
     ok(src.includes(target), `expected probe to mention ${target}`);

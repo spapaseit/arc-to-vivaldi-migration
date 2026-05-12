@@ -12,17 +12,23 @@ export function renderProbeScript(): string {
       result.vivaldi.keys = Object.keys(vivaldi).sort();
       result.vivaldi.namespaces = {};
 
+      // Namespaces of interest for the importer. There is no public
+      // "workspaces" namespace — Workspaces live in vivaldi.prefs under
+      // path "vivaldi.workspaces.list".
       const candidates = [
-        "workspaces",
-        "workspacesPrivate",
+        "prefs",
         "tabsPrivate",
         "bookmarksPrivate",
         "sessionsPrivate",
+        "windowPrivate",
       ];
 
       for (const ns of candidates) {
         const obj = vivaldi[ns];
-        if (!obj) continue;
+        if (!obj) {
+          result.vivaldi.namespaces[ns] = { present: false };
+          continue;
+        }
         const members = {};
         for (const k of Object.keys(obj)) {
           const v = obj[k];
@@ -36,44 +42,45 @@ export function renderProbeScript(): string {
             members[k] = typeof v;
           }
         }
-        result.vivaldi.namespaces[ns] = members;
+        result.vivaldi.namespaces[ns] = { present: true, members };
       }
 
+      // Read the actual workspaces list — that is the source of truth.
       result.workspacesProbe = {};
-      const readAttempts = [
-        ["vivaldi.workspaces.getAll", () =>
-          vivaldi.workspaces && vivaldi.workspaces.getAll && vivaldi.workspaces.getAll()],
-        ["vivaldi.workspacesPrivate.getAll", () =>
-          vivaldi.workspacesPrivate && vivaldi.workspacesPrivate.getAll && vivaldi.workspacesPrivate.getAll()],
-      ];
-
       const pending = [];
 
-      for (const [name, fn] of readAttempts) {
-        try {
-          const r = fn();
-          if (r && typeof r.then === "function") {
-            result.workspacesProbe[name] = { ok: true, async: true, pending: true };
-            pending.push(
-              r.then(
-                (value) => {
-                  result.workspacesProbe[name] = { ok: true, async: true, result: value };
-                },
-                (err) => {
-                  result.workspacesProbe[name] = { ok: false, async: true, error: String(err) };
+      if (vivaldi.prefs && typeof vivaldi.prefs.get === "function") {
+        pending.push(
+          new Promise((res) => {
+            try {
+              vivaldi.prefs.get("vivaldi.workspaces.list", (value) => {
+                if (chrome.runtime && chrome.runtime.lastError) {
+                  result.workspacesProbe["vivaldi.workspaces.list"] = {
+                    ok: false,
+                    error: chrome.runtime.lastError.message,
+                  };
+                } else {
+                  result.workspacesProbe["vivaldi.workspaces.list"] = {
+                    ok: true,
+                    count: Array.isArray(value) ? value.length : null,
+                    sample: Array.isArray(value) ? value.slice(0, 3) : value,
+                  };
                 }
-              )
-            );
-          } else {
-            result.workspacesProbe[name] = { ok: true, async: false, result: r };
-          }
-        } catch (e) {
-          result.workspacesProbe[name] = { ok: false, error: String(e) };
-        }
+                res();
+              });
+            } catch (e) {
+              result.workspacesProbe["vivaldi.workspaces.list"] = { ok: false, error: String(e) };
+              res();
+            }
+          }),
+        );
+      } else {
+        result.workspacesProbe["vivaldi.workspaces.list"] = {
+          ok: false,
+          error: "vivaldi.prefs.get not available",
+        };
       }
 
-      // Wait for all async probes to settle before logging the final JSON,
-      // so the user can copy-paste a complete blob without stale pending entries.
       Promise.allSettled(pending).then(() => {
         console.log(JSON.stringify(result, null, 2));
       });

@@ -25,17 +25,20 @@ test("renderInjectScript: embeds ARC_DATA literal", () => {
 test("renderInjectScript: dryRun flag is honoured", () => {
   const dry = renderInjectScript(sample, { dryRun: true });
   match(dry, /const DRY_RUN = true;/);
-  ok(dry.includes("DRY: createWorkspace"));
+  ok(dry.includes("DRY: would set vivaldi.workspaces.list"));
   ok(dry.includes("DRY: createTab"));
   const wet = renderInjectScript(sample, { dryRun: false });
   match(wet, /const DRY_RUN = false;/);
 });
 
-test("renderInjectScript: references the expected private API names", () => {
+test("renderInjectScript: references the expected private API surface", () => {
   const src = renderInjectScript(sample, { dryRun: false });
   for (const name of [
-    "vivaldi.workspaces",
+    "vivaldi.prefs.get",
+    "vivaldi.prefs.set",
+    "vivaldi.workspaces.list",
     "chrome.tabs.create",
+    "vivExtData",
     "pinned: true",
   ]) {
     ok(src.includes(name), "expected output to mention " + name);
