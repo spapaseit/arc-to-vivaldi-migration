@@ -23,6 +23,7 @@ import { parseArgs } from "./lib/cli.js";
 import { buildInjectablePayload } from "./lib/payload.js";
 import { renderProbeScript } from "./lib/render-probe.js";
 import { renderInjectScript } from "./lib/render-inject.js";
+import { renderUnwindScript } from "./lib/render-unwind.js";
 
 // ---------- Helpers ----------
 
@@ -434,6 +435,24 @@ async function main(): Promise<number> {
     process.stderr.write(
       `${payload.spaces.length} spaces, ${totalTabs} tabs embedded in ${outPath}` +
         (args.mode === "inject-dry-run" ? " (dry-run mode)" : "") +
+        "\n",
+    );
+    return 0;
+  }
+
+  if (args.mode === "unwind" || args.mode === "unwind-dry-run") {
+    const outPath = args.output ?? "./vivaldi-unwind.js";
+    const payload = buildInjectablePayload(conversions, {
+      sourcePath: inputPath,
+      now: new Date(),
+    });
+    const script = renderUnwindScript(payload, {
+      dryRun: args.mode === "unwind-dry-run",
+    });
+    await writeFile(outPath, script, "utf8");
+    process.stderr.write(
+      `unwind script (matches ${payload.spaces.length} space names) written to ${outPath}` +
+        (args.mode === "unwind-dry-run" ? " (dry-run mode)" : "") +
         "\n",
     );
     return 0;

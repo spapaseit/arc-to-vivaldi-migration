@@ -1,4 +1,10 @@
-export type CliMode = "html" | "probe" | "inject" | "inject-dry-run";
+export type CliMode =
+  | "html"
+  | "probe"
+  | "inject"
+  | "inject-dry-run"
+  | "unwind"
+  | "unwind-dry-run";
 
 export interface CliArgs {
   readonly input: string | undefined;
@@ -20,7 +26,7 @@ export function parseArgs(argv: readonly string[]): CliArgs {
   const setMode = (next: CliMode): void => {
     if (mode !== "html") {
       throw new Error(
-        `--probe, --inject and --inject-dry-run are mutually exclusive`,
+        `--probe, --inject, --inject-dry-run, --unwind and --unwind-dry-run are mutually exclusive`,
       );
     }
     mode = next;
@@ -46,6 +52,10 @@ export function parseArgs(argv: readonly string[]): CliArgs {
       setMode("inject");
     } else if (arg === "--inject-dry-run") {
       setMode("inject-dry-run");
+    } else if (arg === "--unwind") {
+      setMode("unwind");
+    } else if (arg === "--unwind-dry-run") {
+      setMode("unwind-dry-run");
     } else if (arg === "-v" || arg === "--verbose") {
       verbose = true;
     } else if (arg === "-h" || arg === "--help") {

@@ -56,3 +56,19 @@ test("parseArgs: --inject + --inject (duplicate) is a conflict", () => {
 test("parseArgs: --inject + --split is also a conflict (reverse order)", () => {
   throws(() => parseArgs(["--inject", "--split"]), /split.*only applies/i);
 });
+
+test("parseArgs: --unwind sets mode to unwind", () => {
+  strictEqual(parseArgs(["--unwind"]).mode, "unwind");
+});
+
+test("parseArgs: --unwind-dry-run sets mode to unwind-dry-run", () => {
+  strictEqual(parseArgs(["--unwind-dry-run"]).mode, "unwind-dry-run");
+});
+
+test("parseArgs: --unwind + --inject is a conflict", () => {
+  throws(() => parseArgs(["--unwind", "--inject"]), /mutually exclusive/);
+});
+
+test("parseArgs: --split + --unwind is a conflict", () => {
+  throws(() => parseArgs(["--split", "--unwind"]), /split.*only applies/i);
+});
