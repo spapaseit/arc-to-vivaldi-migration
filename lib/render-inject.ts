@@ -114,15 +114,17 @@ const THROTTLE_MS = 100;
 
   const summary = { spaces: 0, pinned: 0, unpinned: 0, failures: [] };
 
-  // Each tab: create (lands in active workspace), then chrome.tabs.update to
-  // overwrite vivExtData.workspaceId. The update is what Vivaldi actually
-  // honours; the create-time vivExtData is ignored under load. Finally,
+  // Each tab: create (lands in active workspace, possibly with the wrong
+  // pinned state since Vivaldi drops create-time options under load), then
+  // chrome.tabs.update to overwrite BOTH vivExtData.workspaceId and the
+  // pinned flag. Update is the call Vivaldi reliably honours. Finally,
   // discard the tab to release its renderer — without this, 300+ tabs
   // loading concurrently will freeze the system.
   const createAndAssign = async (url, pinned, workspaceId) => {
     const created = await createTab({ url, active: false, pinned });
     await updateTab(created.id, {
       vivExtData: JSON.stringify({ workspaceId }),
+      pinned,
     });
     await discardTab(created.id);
     return created;
