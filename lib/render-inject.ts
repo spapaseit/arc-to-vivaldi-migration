@@ -24,13 +24,17 @@ export function renderInjectScript(
 // In Vivaldi's tab bar: click the workspace switcher -> "New Workspace"
 // -> type the Arc Space name -> repeat for each Space.
 //
-// Why manually? Vivaldi exposes no public or private API for workspace
-// creation. Direct mutation of the workspaces.list pref makes the
-// workspace appear in the pref but unregistered with Vivaldi's internal
-// sync layer, so it renders as "Restored Workspace" instead of the
-// intended name. Workspaces created via Vivaldi's UI, however, are
-// fully registered, and tabs created against them via chrome.tabs.create
-// land in the right place with the right name.
+// HOW IT WORKS (empirically confirmed against Vivaldi UA Chrome/146):
+//   - chrome.tabs.create silently ignores vivExtData.workspaceId under
+//     load and stamps new tabs with the currently-active workspace's id.
+//   - chrome.tabs.update WITH vivExtData DOES correctly reassign the
+//     tab to a different workspace, both in metadata and in the UI.
+//   - So: we create each tab (it briefly lands in the active workspace),
+//     then immediately update vivExtData.workspaceId to migrate it to
+//     the right workspace. Net effect: tabs flicker through whatever
+//     workspace is active, then settle in their target. Don't switch
+//     workspaces during the import or the visual flicker gets ugly
+//     (the assignment is still correct via metadata).
 //
 // If your machine struggles with the volume of new tabs, increase
 // THROTTLE_MS below.
@@ -49,13 +53,18 @@ const THROTTLE_MS = 50;
   if (typeof vivaldi.prefs.get !== "function") {
     fail("vivaldi.prefs.get not callable — Vivaldi may have changed the API. Re-run --probe.");
   }
-  if (typeof chrome === "undefined" || !chrome.tabs || typeof chrome.tabs.create !== "function") {
-    fail("chrome.tabs.create not available in this context.");
+  if (typeof chrome === "undefined" || !chrome.tabs || typeof chrome.tabs.create !== "function" || typeof chrome.tabs.update !== "function") {
+    fail("chrome.tabs.create / chrome.tabs.update not available in this context.");
   }
 
   const getPref = (path) => new Promise((res) => vivaldi.prefs.get(path, res));
   const createTab = (tabOpts) => new Promise((res, rej) =>
     chrome.tabs.create(tabOpts, (t) =>
+      chrome.runtime.lastError ? rej(chrome.runtime.lastError.message) : res(t),
+    ),
+  );
+  const updateTab = (tabId, updateInfo) => new Promise((res, rej) =>
+    chrome.tabs.update(tabId, updateInfo, (t) =>
       chrome.runtime.lastError ? rej(chrome.runtime.lastError.message) : res(t),
     ),
   );
@@ -82,8 +91,21 @@ const THROTTLE_MS = 50;
     );
   }
   log("all", ARC_DATA.spaces.length, "Arc Space names matched to existing workspaces.");
+  log("NOTE: do not switch workspaces during the import. Tabs will briefly appear");
+  log("      in whatever workspace is active, then migrate to their target.");
 
   const summary = { spaces: 0, pinned: 0, unpinned: 0, failures: [] };
+
+  // Each tab: create (lands in active workspace), then chrome.tabs.update to
+  // overwrite vivExtData.workspaceId. The update is what Vivaldi actually
+  // honours; the create-time vivExtData is ignored under load.
+  const createAndAssign = async (url, pinned, workspaceId) => {
+    const created = await createTab({ url, active: false, pinned });
+    await updateTab(created.id, {
+      vivExtData: JSON.stringify({ workspaceId }),
+    });
+    return created;
+  };
 
   for (const space of ARC_DATA.spaces) {
     const workspaceId = nameToId.get(space.title);
@@ -93,15 +115,13 @@ const THROTTLE_MS = 50;
 
     const pinnedBefore = summary.pinned;
     for (const tab of space.pinned) {
-      const tabOpts = {
-        url: tab.url,
-        active: false,
-        pinned: true,
-        vivExtData: JSON.stringify({ workspaceId }),
-      };
-      if (DRY_RUN) { log("DRY: createTab", tabOpts); summary.pinned++; continue; }
+      if (DRY_RUN) {
+        log("DRY: createAndAssign", { url: tab.url, pinned: true, workspaceId });
+        summary.pinned++;
+        continue;
+      }
       try {
-        await createTab(tabOpts);
+        await createAndAssign(tab.url, true, workspaceId);
         summary.pinned++;
         await sleep(THROTTLE_MS);
       } catch (err) {
@@ -113,15 +133,13 @@ const THROTTLE_MS = 50;
 
     const unpinnedBefore = summary.unpinned;
     for (const tab of space.unpinned) {
-      const tabOpts = {
-        url: tab.url,
-        active: false,
-        pinned: false,
-        vivExtData: JSON.stringify({ workspaceId }),
-      };
-      if (DRY_RUN) { log("DRY: createTab", tabOpts); summary.unpinned++; continue; }
+      if (DRY_RUN) {
+        log("DRY: createAndAssign", { url: tab.url, pinned: false, workspaceId });
+        summary.unpinned++;
+        continue;
+      }
       try {
-        await createTab(tabOpts);
+        await createAndAssign(tab.url, false, workspaceId);
         summary.unpinned++;
         await sleep(THROTTLE_MS);
       } catch (err) {

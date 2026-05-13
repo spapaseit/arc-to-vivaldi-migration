@@ -25,7 +25,7 @@ test("renderInjectScript: embeds ARC_DATA literal", () => {
 test("renderInjectScript: dryRun flag is honoured", () => {
   const dry = renderInjectScript(sample, { dryRun: true });
   match(dry, /const DRY_RUN = true;/);
-  ok(dry.includes("DRY: createTab"));
+  ok(dry.includes("DRY: createAndAssign"));
   const wet = renderInjectScript(sample, { dryRun: false });
   match(wet, /const DRY_RUN = false;/);
 });
@@ -36,12 +36,22 @@ test("renderInjectScript: references the expected private API surface", () => {
     "vivaldi.prefs.get",
     "vivaldi.workspaces.list",
     "chrome.tabs.create",
+    "chrome.tabs.update",
     "vivExtData",
-    "pinned: true",
     "THROTTLE_MS",
   ]) {
     ok(src.includes(name), "expected output to mention " + name);
   }
+});
+
+test("renderInjectScript: uses create-then-update to assign workspace", () => {
+  const src = renderInjectScript(sample, { dryRun: false });
+  ok(src.includes("createAndAssign"), "expected create+update helper named createAndAssign");
+  // The create call must NOT include vivExtData (Vivaldi ignores it under load),
+  // and assignment must happen via a subsequent chrome.tabs.update.
+  const createMatch = src.match(/createTab\(\{[^}]+\}\)/);
+  ok(createMatch, "expected a createTab call");
+  ok(!createMatch![0].includes("vivExtData"), "create call must NOT include vivExtData — it is ignored at create time");
 });
 
 test("renderInjectScript: does NOT mutate the workspaces.list pref", () => {

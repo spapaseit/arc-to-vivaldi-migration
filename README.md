@@ -131,11 +131,19 @@ disabled. Paste it into the same DevTools console. The script:
 
 - Reads `vivaldi.workspaces.list` to map each Arc Space title to the Workspace
   ID you created in step 1.
-- For each Space, creates pinned and regular tabs assigned to that Workspace
-  via `vivExtData.workspaceId`.
-- Throttles each `chrome.tabs.create` by 50 ms (tunable via `THROTTLE_MS` near
+- For each tab: calls `chrome.tabs.create` (the tab briefly appears in
+  whichever Workspace is currently active), then immediately calls
+  `chrome.tabs.update` with `vivExtData.workspaceId` set to the target — this
+  is the call Vivaldi actually honours, and the tab migrates to its proper
+  Workspace.
+- Throttles each create+update cycle by 50 ms (tunable via `THROTTLE_MS` near
   the top of the generated file) so the system can absorb a large import
   without choking.
+
+**Don't switch Workspaces during the import.** Tabs flicker through whatever
+Workspace is active before settling in their target, and switching while the
+import runs adds visual chaos. The metadata assignment is correct either way,
+but the experience is less alarming if you let it finish in one Workspace.
 
 **Unwinding.** If you want to roll back, run `--unwind-dry-run` to preview, then
 `--unwind` to actually close every tab in any Workspace matching an Arc Space
