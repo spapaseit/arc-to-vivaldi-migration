@@ -73,6 +73,11 @@ folder containing `Pinned` and `Unpinned` subfolders, mirroring Arc's layout.
 
 ## Experimental: recreate Arc Spaces as Vivaldi Workspaces
 
+**Status:** working as of Vivaldi on Chromium 146 (late-2025/early-2026 builds).
+Verified end-to-end on a ~315-tab import across five Spaces. Workspace
+assignment, pinned state, and tab discarding all behave correctly. Tab Stacks
+(folders within a workspace) are still manual — see the bottom of this section.
+
 The HTML import only covers bookmarks. If you also want Arc's Spaces populated
 into Vivaldi Workspaces as real open tabs (pinned and regular), there is a
 paste-into-DevTools workflow.
@@ -162,6 +167,19 @@ Mapping summary:
 | Pinned column | Pinned tabs in the Workspace |
 | Unpinned column (flattened) | Regular tabs in the Workspace |
 | Folder hierarchy inside columns | Lost (still preserved in the HTML import) |
+
+### Tab Stacks (folders inside a Workspace)
+
+Vivaldi's Tab Stacks (the equivalent of Arc's nested folders within a Space)
+must be created manually. The importer flattens Arc's folder hierarchy when it
+builds the paste-able payload, so the structure isn't available at import time.
+
+To recreate stacks: in Vivaldi, Ctrl-click multiple tabs in a Workspace →
+right-click → **Stack with Selected** → give the stack a name. Three clicks
+per stack.
+
+The full folder hierarchy is still preserved in the HTML bookmarks output, so
+if you want navigation by folder, use Vivaldi's Bookmarks panel.
 
 ## Notes
 
