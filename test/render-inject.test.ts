@@ -54,6 +54,12 @@ test("renderInjectScript: uses create-then-update to assign workspace", () => {
   ok(!createMatch![0].includes("vivExtData"), "create call must NOT include vivExtData — it is ignored at create time");
 });
 
+test("renderInjectScript: discards each tab after assignment to spare resources", () => {
+  const src = renderInjectScript(sample, { dryRun: false });
+  ok(src.includes("chrome.tabs.discard"), "expected chrome.tabs.discard call to release renderers");
+  ok(src.includes("discardTab"), "expected a discardTab helper");
+});
+
 test("renderInjectScript: does NOT mutate the workspaces.list pref", () => {
   const src = renderInjectScript(sample, { dryRun: false });
   ok(!src.includes("vivaldi.prefs.set"), "inject must not write the workspaces pref — user owns it now");

@@ -36,12 +36,18 @@ export function renderInjectScript(
 //     workspaces during the import or the visual flicker gets ugly
 //     (the assignment is still correct via metadata).
 //
-// If your machine struggles with the volume of new tabs, increase
-// THROTTLE_MS below.
+// After each create+update we also call chrome.tabs.discard to release
+// the tab's renderer immediately. Without this, Vivaldi tries to fully
+// load every newly created tab, and 300+ concurrent loads will eat all
+// your memory and freeze the system. With discard, the tab stays in the
+// workspace with its URL intact but is unloaded — same as Arc's
+// always-pinned tabs behave by default.
+//
+// If your machine still struggles, increase THROTTLE_MS below.
 
 const ARC_DATA = ${dataLiteral};
 const DRY_RUN = ${dryRunLiteral};
-const THROTTLE_MS = 50;
+const THROTTLE_MS = 100;
 
 (async () => {
   const log = (...args) => console.log("[arc->vivaldi]", ...args);
@@ -68,6 +74,18 @@ const THROTTLE_MS = 50;
       chrome.runtime.lastError ? rej(chrome.runtime.lastError.message) : res(t),
     ),
   );
+  // Discard is best-effort. Some tabs (active, pinned, or still in initial
+  // load) refuse discard; that's fine — Vivaldi will lazy-discard on its own
+  // schedule. We swallow any lastError.
+  const discardTab = (tabId) => new Promise((res) => {
+    if (typeof chrome.tabs.discard !== "function") { res(); return; }
+    try {
+      chrome.tabs.discard(tabId, () => {
+        void chrome.runtime.lastError;
+        res();
+      });
+    } catch (e) { res(); }
+  });
   const sleep = (ms) => ms > 0 ? new Promise((r) => setTimeout(r, ms)) : Promise.resolve();
 
   // 1. Read existing workspace list. We only USE these — never mutate.
@@ -98,12 +116,15 @@ const THROTTLE_MS = 50;
 
   // Each tab: create (lands in active workspace), then chrome.tabs.update to
   // overwrite vivExtData.workspaceId. The update is what Vivaldi actually
-  // honours; the create-time vivExtData is ignored under load.
+  // honours; the create-time vivExtData is ignored under load. Finally,
+  // discard the tab to release its renderer — without this, 300+ tabs
+  // loading concurrently will freeze the system.
   const createAndAssign = async (url, pinned, workspaceId) => {
     const created = await createTab({ url, active: false, pinned });
     await updateTab(created.id, {
       vivExtData: JSON.stringify({ workspaceId }),
     });
+    await discardTab(created.id);
     return created;
   };
 

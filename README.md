@@ -136,9 +136,13 @@ disabled. Paste it into the same DevTools console. The script:
   `chrome.tabs.update` with `vivExtData.workspaceId` set to the target — this
   is the call Vivaldi actually honours, and the tab migrates to its proper
   Workspace.
-- Throttles each create+update cycle by 50 ms (tunable via `THROTTLE_MS` near
-  the top of the generated file) so the system can absorb a large import
-  without choking.
+- Calls `chrome.tabs.discard` after each tab to release its renderer
+  process immediately. Without this, hundreds of tabs would try to fully
+  load in parallel and freeze your system. Discarded tabs still appear in
+  the workspace with their URL — they just don't load until you click on
+  them.
+- Throttles each create-update-discard cycle by 100 ms (tunable via
+  `THROTTLE_MS` near the top of the generated file).
 
 **Don't switch Workspaces during the import.** Tabs flicker through whatever
 Workspace is active before settling in their target, and switching while the
