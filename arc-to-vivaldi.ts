@@ -9,6 +9,7 @@
 import { readFile, writeFile, readdir, mkdir } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
+import { homedir } from "node:os";
 import process from "node:process";
 
 import type {
@@ -74,6 +75,21 @@ function uniqueSlug(base: string, taken: Set<string>): string {
 // ---------- CLI ----------
 
 async function autoDiscoverInput(): Promise<string> {
+  // macOS: Arc keeps the sidebar at a fixed path under Application Support.
+  if (process.platform === "darwin") {
+    const candidate = join(
+      homedir(),
+      "Library",
+      "Application Support",
+      "Arc",
+      "StorableSidebar.json",
+    );
+    if (existsSync(candidate)) return candidate;
+    throw new Error(
+      `no StorableSidebar.json at ${candidate}; pass --input explicitly`,
+    );
+  }
+  // Windows: Arc installs under %LOCALAPPDATA%\Packages\TheBrowserCompany.Arc_*.
   const localAppData = process.env["LOCALAPPDATA"];
   if (localAppData === undefined) {
     throw new Error("LOCALAPPDATA env var not set; pass --input explicitly");

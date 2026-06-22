@@ -73,10 +73,18 @@ folder containing `Pinned` and `Unpinned` subfolders, mirroring Arc's layout.
 
 ## Experimental: recreate Arc Spaces as Vivaldi Workspaces
 
-**Status:** working as of Vivaldi on Chromium 146 (late-2025/early-2026 builds).
-Verified end-to-end on a ~315-tab import across five Spaces. Workspace
+**Status:** working on Vivaldi atop Chromium 146 and 148 (late-2025/early-2026
+builds). Verified end-to-end on a ~315-tab import across five Spaces. Workspace
 assignment, pinned state, and tab discarding all behave correctly. Tab Stacks
 (folders within a workspace) are still manual — see the bottom of this section.
+
+The version numbers above are informational, not a hard requirement: the
+importer detects the private-API shapes it touches structurally rather than
+gating on a version, so newer builds generally keep working. It logs the
+detected Chromium version on run for diagnostics. The one place the API surface
+bit us across builds — `vivaldi.prefs.get` returning a `{defaultValue, value}`
+descriptor on some versions instead of the bare value — is handled
+automatically. If something else shifts, re-run `--probe` and compare.
 
 The HTML import only covers bookmarks. If you also want Arc's Spaces populated
 into Vivaldi Workspaces as real open tabs (pinned and regular), there is a

@@ -69,7 +69,27 @@ const DISCARD_DELAY_MS = 1000;
     fail("chrome.tabs.create / chrome.tabs.update not available in this context.");
   }
 
-  const getPref = (path) => new Promise((res) => vivaldi.prefs.get(path, res));
+  // Diagnostics only — NOT used to branch behaviour. The private-API shapes we
+  // touch are detected structurally (see unwrapPref below), so this importer
+  // is version-agnostic. We log the Chromium version purely so that if a
+  // future Vivaldi build does break something, the console output records the
+  // version it broke on. Last verified working on Chromium 146 and 148.
+  // Parse via split (not regex): this whole script is emitted through a JS
+  // template literal, which would eat the backslashes in a regex literal.
+  // UA tail looks like "Chrome/148.0.0.0 Safari/537.36" -> take "148.0.0.0".
+  const chromiumVersion = ((navigator.userAgent.split("Chrome/")[1] || "").split(" ")[0]) || "unknown";
+  log("Chromium version (from UA):", chromiumVersion, "— verified on 146/148; re-run --probe if the API surface shifted.");
+
+  // vivaldi.prefs.get's callback shape varies across Vivaldi versions: some
+  // builds hand back the bare value, others wrap it in a pref descriptor
+  // { defaultValue, value }. Unwrap .value when we see that shape so the rest
+  // of the script always works with the real value. (Confirmed via --probe:
+  // newer Chromium-based builds return the descriptor.)
+  const unwrapPref = (result) =>
+    result && typeof result === "object" && !Array.isArray(result) && "value" in result
+      ? result.value
+      : result;
+  const getPref = (path) => new Promise((res) => vivaldi.prefs.get(path, (result) => res(unwrapPref(result))));
   const createTab = (tabOpts) => new Promise((res, rej) =>
     chrome.tabs.create(tabOpts, (t) =>
       chrome.runtime.lastError ? rej(chrome.runtime.lastError.message) : res(t),

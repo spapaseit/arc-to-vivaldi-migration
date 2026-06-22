@@ -4,6 +4,13 @@ node_modules/
 arc-*.html
 split/
 
+# Generated DevTools scripts and probe captures — they embed real tab URLs,
+# workspace names, and other personal browsing data; never commit them.
+vivaldi-import.js
+vivaldi-unwind.js
+probe-vivaldi.js
+probe-vivaldi-consoleoutput.json
+
 # A real StorableSidebar.json contains personal browsing data — never commit it
 StorableSidebar.json
 

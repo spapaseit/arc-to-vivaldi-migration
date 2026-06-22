@@ -60,6 +60,31 @@ test("renderInjectScript: discards each tab after assignment to spare resources"
   ok(src.includes("discardTab"), "expected a discardTab helper");
 });
 
+test("renderInjectScript: unwraps the {defaultValue, value} pref descriptor", () => {
+  const src = renderInjectScript(sample, { dryRun: false });
+  // Some Vivaldi builds return the bare value from prefs.get, others wrap it
+  // in a { defaultValue, value } descriptor. The reader must handle both or
+  // it aborts with "returned non-array" on the wrapping builds.
+  ok(src.includes("unwrapPref"), "expected an unwrapPref helper");
+  ok(src.includes('"value" in result'), "expected unwrap to detect the descriptor's value key");
+});
+
+test("renderInjectScript: logs the Chromium version for diagnostics without gating on it", () => {
+  const src = renderInjectScript(sample, { dryRun: false });
+  ok(src.includes("navigator.userAgent"), "expected the version to be read from the UA");
+  ok(src.includes("Chromium version"), "expected a version log line");
+});
+
+test("renderInjectScript: parses the UA via split, not a regex (template literals eat backslashes)", () => {
+  const src = renderInjectScript(sample, { dryRun: false });
+  // A regex literal here would lose its \d / \. / \/ escapes when emitted
+  // through the template literal, producing a valid-but-wrong matcher that
+  // includes()-checks and parse-checks both miss. So we read the version with
+  // string ops and assert that, not a regex.
+  ok(src.includes('split("Chrome/")'), "expected UA version parsed via split");
+  ok(!/navigator\.userAgent\.match\(/.test(src), "must not parse the UA with a regex literal");
+});
+
 test("renderInjectScript: does NOT mutate the workspaces.list pref", () => {
   const src = renderInjectScript(sample, { dryRun: false });
   ok(!src.includes("vivaldi.prefs.set"), "inject must not write the workspaces pref — user owns it now");
